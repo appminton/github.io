@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 1rem 0; font-family: sans-serif; background: transparent; }
+  canvas { border-radius: 12px; border: 0.5px solid #ccc; display: block; }
+  #ui { width: 520px; margin-top: 12px; display: flex; gap: 10px; align-items: center; }
+  #scoreboard { flex: 1; background: #f5f5f5; border-radius: 12px; border: 0.5px solid #ddd; padding: 12px 16px; }
+  #scoreboard h3 { font-size: 14px; font-weight: 500; color: #888; margin-bottom: 8px; }
+  .score-row { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; border-top: 0.5px solid #eee; }
+  .score-row:first-of-type { border-top: none; }
+  .rank { color: #aaa; min-width: 20px; }
+  .score-val { font-weight: 500; }
+  #toggle-btn { background: rgba(55,138,221,0.15); border: 0.5px solid rgba(55,138,221,0.5); border-radius: 8px; color: #378add; padding: 8px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  #toggle-btn.off { background: transparent; color: #aaa; border-color: #ddd; }
+  #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(5,10,30,0.82); border-radius: 12px; }
+  #overlay h2 { color: #e8f0ff; font-size: 22px; font-weight: 500; }
+  #overlay p { color: #9ab0d8; font-size: 14px; text-align: center; }
+  #overlay input { background: rgba(255,255,255,0.08); border: 0.5px solid rgba(150,180,255,0.3); border-radius: 8px; padding: 8px 14px; color: #e8f0ff; font-size: 15px; text-align: center; outline: none; width: 200px; }
+  #overlay input::placeholder { color: rgba(200,220,255,0.4); }
+  #overlay button { background: rgba(55,138,221,0.25); border: 0.5px solid rgba(55,138,221,0.6); border-radius: 8px; color: #7ec8ff; padding: 10px 28px; font-size: 15px; cursor: pointer; }
+  #canvas-wrap { position: relative; width: 520px; height: 380px; }
+</style>
+</head>
+<body>
+<div id="canvas-wrap">
+  <canvas id="c" width="520" height="380"></canvas>
+  <div id="overlay">
+    <h2 id="ol-title">🚀 Space Flapper</h2>
+    <p id="ol-sub">Pilot your rocket through asteroid fields!</p>
+    <input id="name-in" placeholder="Enter pilot name" maxlength="16" />
+    <button id="ol-btn">Launch</button>
+    <p id="ol-score" style="display:none; font-size:18px; color:#7ec8ff; font-weight:500;"></p>
+  </div>
+</div>
+<div id="ui">
+  <div id="scoreboard">
+    <h3>Mission log</h3>
+    <div id="score-list"><p style="font-size:13px;color:#aaa;">No missions yet.</p></div>
+  </div>
+  <button id="toggle-btn">Hitboxes: ON</button>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const olTitle = document.getElementById('ol-title');
+const olSub = document.getElementById('ol-sub');
+const olBtn = document.getElementById('ol-btn');
+const olScore = document.getElementById('ol-score');
+const nameIn = document.getElementById('name-in');
+const scoreList = document.getElementById('score-list');
+const toggleBtn = document.getElementById('toggle-btn');
+
+const W = 520, H = 380;
+const GRAVITY = 0.38, FLAP = -7.2, PIPE_W = 52, GAP = 130, PIPE_SPEED = 2.4;
+const ROCKET_X = 80, ROCKET_R = 7, PIPE_MARGIN = 6;
+
+let state = 'start', ry, rv, score, pipes, frame, stars;
+let countdown, countdownTimer, scores = [], currentPlayer = '';
+let showHitboxes = true;
+
+toggleBtn.addEventListener('click', () => {
+  showHitboxes = !showHitboxes;
+  toggleBtn.textContent = `Hitboxes: ${showHitboxes ? 'ON' : 'OFF'}`;
+  toggleBtn.className = showHitboxes ? '' : 'off';
+});
+
+function mkStars() {
+  stars = [];
+  for (let i = 0; i < 80; i++)
+    stars.push({ x: Math.random()*W, y: Math.random()*H, r: Math.random()*1.4+0.3 });
+}
+
+function reset() { ry = H/2; rv = 0; score = 0; pipes = []; frame = 0; mkStars(); }
+
+function addPipe() {
+  pipes.push({ x: W, top: 60 + Math.random()*(H - GAP - 120), scored: false });
+}
+
+function drawBg() {
+  ctx.fillStyle = '#05080f'; ctx.fillRect(0,0,W,H);
+  stars.forEach(s => {
+    const tw = 0.5 + 0.5*Math.sin(frame*0.05 + s.x);
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(180,210,255,${0.4+0.6*tw})`; ctx.fill();
+  });
+}
+
+function drawPlanet() {
+  ctx.beginPath(); ctx.arc(430,60,28,0,Math.PI*2);
+  ctx.fillStyle = '#1a3a6a'; ctx.fill();
+  ctx.strokeStyle = '#2a5aaa'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(430,60,38,9,0.3,0,Math.PI*2);
+  ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawRocket(y, vel) {
+  ctx.save(); ctx.translate(ROCKET_X, y);
+  ctx.rotate(Math.max(-0.5, Math.min(0.5, vel*0.05)));
+  ctx.fillStyle = '#c0d8ff';
+  ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(-8,-10); ctx.lineTo(-8,10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#378add'; ctx.fillRect(-8,-8,16,16);
+  ctx.fillStyle = '#7ec8ff'; ctx.beginPath(); ctx.arc(2,-1,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#e05020';
+  ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(-18,-5); ctx.lineTo(-22,0); ctx.lineTo(-18,5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,140,60,0.7)';
+  ctx.beginPath(); ctx.moveTo(-8,0); ctx.lineTo(-14,-3); ctx.lineTo(-16,0); ctx.lineTo(-14,3); ctx.closePath(); ctx.fill();
+  if (showHitboxes) {
+    ctx.beginPath(); ctx.arc(0,0,ROCKET_R,0,Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,80,80,0.95)'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAsteroid(x, top, bottom) {
+  const drawOne = (bx, by, bh) => {
+    ctx.fillStyle = '#3a3040'; ctx.strokeStyle = '#6a5a80'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) {
+      const a = (i/7)*Math.PI*2, r = (PIPE_W/2-2)+(i%2===0?5:0);
+      const px = bx+PIPE_W/2+Math.cos(a)*r, py = by+bh/2+Math.sin(a)*r*0.5;
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  };
+  drawOne(x, 0, top);
+  drawOne(x, top+GAP, bottom);
+
+  if (showHitboxes) {
+    const hx = x + PIPE_MARGIN, hw = PIPE_W - PIPE_MARGIN*2;
+    ctx.strokeStyle = 'rgba(255,80,80,0.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+    ctx.strokeRect(hx, 0, hw, top - PIPE_MARGIN);
+    ctx.strokeRect(hx, top+GAP+PIPE_MARGIN, hw, H-top-GAP-PIPE_MARGIN);
+    ctx.setLineDash([]);
+  }
+}
+
+function checkCollision(p) {
+  const hx1 = p.x+PIPE_MARGIN, hx2 = p.x+PIPE_W-PIPE_MARGIN;
+  if (ROCKET_X+ROCKET_R < hx1 || ROCKET_X-ROCKET_R > hx2) return false;
+  if (ry-ROCKET_R < p.top-PIPE_MARGIN) return true;
+  if (ry+ROCKET_R > p.top+GAP+PIPE_MARGIN) return true;
+  return false;
+}
+
+function drawHUD() {
+  ctx.fillStyle = 'rgba(200,225,255,0.85)'; ctx.font = '500 18px sans-serif';
+  ctx.textAlign = 'left'; ctx.fillText(currentPlayer, 12, 28);
+  ctx.textAlign = 'right'; ctx.fillText(score, W-12, 28); ctx.textAlign = 'left';
+}
+
+function drawCountdownOverlay() {
+  ctx.fillStyle = 'rgba(5,10,30,0.55)'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#7ec8ff'; ctx.font = '500 22px sans-serif';
+  ctx.fillText(`Get ready, ${currentPlayer}!`, W/2, H/2-48);
+  ctx.font = '500 80px sans-serif';
+  ctx.fillStyle = countdown > 1 ? '#e8f0ff' : '#7ec8ff';
+  ctx.fillText(countdown, W/2, H/2+24);
+  ctx.font = '500 15px sans-serif'; ctx.fillStyle = '#9ab0d8';
+  ctx.fillText('click or press space to flap', W/2, H/2+60);
+  ctx.textAlign = 'left';
+}
+
+function startCountdown() {
+  state = 'countdown'; countdown = 3;
+  drawBg(); drawPlanet(); drawRocket(ry,0); drawCountdownOverlay();
+  countdownTimer = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) { clearInterval(countdownTimer); state = 'playing'; requestAnimationFrame(loop); }
+    else { drawBg(); drawPlanet(); drawRocket(ry,0); drawCountdownOverlay(); }
+  }, 1000);
+}
+
+function loop() {
+  if (state !== 'playing') return;
+  frame++; drawBg(); drawPlanet();
+  if (frame % 90 === 0) addPipe();
+  rv += GRAVITY; ry += rv;
+  let dead = false;
+  pipes.forEach(p => {
+    p.x -= PIPE_SPEED;
+    drawAsteroid(p.x, p.top, H-p.top-GAP);
+    if (!p.scored && p.x+PIPE_W < ROCKET_X-ROCKET_R) { score++; p.scored = true; }
+    if (checkCollision(p)) dead = true;
+  });
+  pipes = pipes.filter(p => p.x > -PIPE_W);
+  if (ry > H+20 || ry < -20) dead = true;
+  drawRocket(ry, rv); drawHUD();
+  if (dead) { endGame(); return; }
+  requestAnimationFrame(loop);
+}
+
+function endGame() {
+  state = 'dead';
+  scores.push({ name: currentPlayer, score });
+  scores.sort((a,b) => b.score-a.score);
+  updateBoard();
+  olTitle.textContent = '💥 Mission over';
+  olSub.textContent = `Asteroids dodged: ${score}`;
+  olScore.textContent = `${currentPlayer}: ${score} pts`;
+  olScore.style.display = 'block'; nameIn.value = '';
+  olBtn.textContent = 'Next pilot'; overlay.style.display = 'flex';
+}
+
+function updateBoard() {
+  if (!scores.length) return;
+  scoreList.innerHTML = scores.slice(0,8).map((s,i) =>
+    `<div class="score-row"><span class="rank">${i+1}.</span><span>${s.name}</span><span class="score-val">${s.score}</span></div>`
+  ).join('');
+}
+
+function flap() { if (state==='playing') rv = FLAP; }
+canvas.addEventListener('click', flap);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); flap(); }, { passive: false });
+document.addEventListener('keydown', e => { if (e.code==='Space') { e.preventDefault(); flap(); } });
+olBtn.addEventListener('click', () => {
+  currentPlayer = nameIn.value.trim() || 'Pilot';
+  reset(); overlay.style.display = 'none'; olScore.style.display = 'none'; startCountdown();
+});
+nameIn.addEventListener('keydown', e => { if (e.key==='Enter') olBtn.click(); });
+mkStars(); drawBg(); drawPlanet();
+</script>
+</body>
+</html>
