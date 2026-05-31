@@ -1,0 +1,341 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#gc{display:flex;flex-direction:column;align-items:center;padding:1.25rem 1rem;gap:.9rem;font-family:var(--font-sans)}
+#hud{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;max-width:540px}
+.sc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 10px;text-align:center}
+.sl{font-size:11px;color:var(--color-text-secondary)}
+.sv{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+#cw{position:relative;cursor:crosshair;border-radius:var(--border-radius-lg);border:.5px solid var(--color-border-tertiary);overflow:hidden;background:var(--color-background-secondary)}
+canvas{display:block}
+#rb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:0;transition:opacity .2s}
+#rb.show{opacity:1}
+#rs{font-size:38px;font-weight:500;color:var(--color-text-primary)}
+#rl{font-size:13px;color:var(--color-text-secondary);margin-top:3px}
+#inst{font-size:13px;color:var(--color-text-secondary);text-align:center;max-width:460px;line-height:1.6}
+#nb{display:none;padding:7px 24px;font-size:13px;font-weight:500;background:var(--color-background-primary);border:.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-primary);transition:background .15s,transform .1s}
+#nb:hover{background:var(--color-background-secondary)}
+#nb:active{transform:scale(.98)}
+
+#name-screen{display:flex;flex-direction:column;align-items:center;gap:1rem;padding:2rem 1rem;width:100%;max-width:540px}
+#name-screen h2{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+#name-screen p{font-size:13px;color:var(--color-text-secondary);text-align:center}
+#name-input{width:100%;max-width:280px;font-size:15px;padding:8px 12px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)}
+#start-btn{padding:8px 28px;font-size:14px;font-weight:500;background:var(--color-background-primary);border:.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-primary);transition:background .15s}
+#start-btn:hover{background:var(--color-background-secondary)}
+
+#lb-screen{display:none;flex-direction:column;align-items:center;gap:.75rem;width:100%;max-width:540px;padding:.5rem 0}
+#lb-screen h2{font-size:16px;font-weight:500;color:var(--color-text-primary)}
+#lb-table{width:100%;border-collapse:collapse;font-size:13px}
+#lb-table th{text-align:left;padding:6px 10px;font-size:11px;color:var(--color-text-secondary);font-weight:400;border-bottom:.5px solid var(--color-border-tertiary)}
+#lb-table td{padding:7px 10px;border-bottom:.5px solid var(--color-border-tertiary);color:var(--color-text-primary)}
+.lb-you{background:var(--color-background-info);color:var(--color-text-info)!important}
+#play-again-btn{padding:7px 24px;font-size:13px;font-weight:500;background:var(--color-background-primary);border:.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;color:var(--color-text-primary);transition:background .15s;margin-top:.25rem}
+#play-again-btn:hover{background:var(--color-background-secondary)}
+</style>
+
+<h2 class="sr-only">Perfect Cut — slice 10 shapes as close to 50/50 as possible, with leaderboard</h2>
+
+<div id="gc">
+  <div id="name-screen">
+    <h2>perfect cut</h2>
+    <p>Slice each shape as close to 50/50 as you can.<br>10 rounds · up to 1000 pts each.</p>
+    <input id="name-input" type="text" placeholder="your name" maxlength="20" />
+    <button id="start-btn">start game</button>
+    <div id="lb-screen">
+      <h2>leaderboard</h2>
+      <table id="lb-table">
+        <thead><tr><th>#</th><th>player</th><th>score</th><th>best cut</th></tr></thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="game-area" style="display:none;flex-direction:column;align-items:center;gap:.9rem;width:100%">
+    <div id="hud">
+      <div class="sc"><div class="sl">score</div><div class="sv" id="score-val">0</div></div>
+      <div class="sc"><div class="sl">best cut</div><div class="sv" id="best-val">—</div></div>
+      <div class="sc"><div class="sl">round</div><div class="sv" id="round-val">1/10</div></div>
+      <div class="sc"><div class="sl">shape</div><div class="sv" id="shape-val">—</div></div>
+    </div>
+    <div id="cw">
+      <canvas id="c" width="520" height="300"></canvas>
+      <div id="rb"><div id="rs"></div><div id="rl"></div></div>
+    </div>
+    <button id="nb"></button>
+    <p id="inst">Draw a line across the shape to cut it in half!</p>
+  </div>
+</div>
+
+<script>
+const TOTAL_ROUNDS = 10;
+const SHAPES = [
+  {name:'rectangle',color:'#7F77DD'},
+  {name:'circle',   color:'#1D9E75'},
+  {name:'triangle', color:'#D85A30'},
+  {name:'hexagon',  color:'#D4537E'},
+  {name:'star',     color:'#BA7517'},
+  {name:'diamond',  color:'#378ADD'},
+  {name:'rectangle',color:'#993556'},
+  {name:'circle',   color:'#534AB7'},
+  {name:'triangle', color:'#0F6E56'},
+  {name:'hexagon',  color:'#993C1D'},
+];
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const CX = W/2, CY = H/2, R = 82;
+
+let playerName = '';
+let gs = {};
+
+function initGame() {
+  gs = {phase:'draw',score:0,round:0,best:null,dragging:false,start:null,end:null,cut:null};
+}
+
+function getShapeOrder() {
+  let arr = [...SHAPES];
+  for(let i=arr.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  return arr;
+}
+let shapeOrder = [];
+
+function getParams(name) {
+  if(name==='rectangle') return {x:CX-100,y:CY-65,w:200,h:130};
+  if(name==='circle') return {cx:CX,cy:CY,r:R};
+  if(name==='triangle') return [{x:CX,y:CY-R},{x:CX-R*.93,y:CY+R*.5},{x:CX+R*.93,y:CY+R*.5}];
+  if(name==='hexagon'){let p=[];for(let i=0;i<6;i++){let a=Math.PI/3*i-Math.PI/6;p.push({x:CX+R*Math.cos(a),y:CY+R*Math.sin(a)});}return p;}
+  if(name==='star'){let p=[];for(let i=0;i<10;i++){let a=Math.PI/5*i-Math.PI/2,r=i%2===0?R:R*.42;p.push({x:CX+r*Math.cos(a),y:CY+r*Math.sin(a)});}return p;}
+  if(name==='diamond') return [{x:CX,y:CY-R*1.2},{x:CX+R*.75,y:CY},{x:CX,y:CY+R*1.2},{x:CX-R*.75,y:CY}];
+}
+
+function polyArea(pts){let a=0;for(let i=0;i<pts.length;i++){let j=(i+1)%pts.length;a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}return Math.abs(a)/2;}
+
+function lineSide(px,py,x1,y1,x2,y2){return(x2-x1)*(py-y1)-(y2-y1)*(px-x1);}
+
+function lineIsect(ax,ay,bx,by,cx,cy,dx,dy){
+  let A1=by-ay,B1=ax-bx,C1=A1*ax+B1*ay;
+  let A2=dy-cy,B2=cx-dx,C2=A2*cx+B2*cy;
+  let det=A1*B2-A2*B1;
+  if(Math.abs(det)<1e-10)return null;
+  let x=(C1*B2-C2*B1)/det,y=(A1*C2-A2*C1)/det;
+  let t1=(bx-ax)?((x-ax)/(bx-ax)):((y-ay)/(by-ay));
+  let t2=(dx-cx)?((x-cx)/(dx-cx)):((y-cy)/(dy-cy));
+  if(t1>=-1e-9&&t1<=1+1e-9&&t2>=-1e-9&&t2<=1+1e-9)return{x,y};
+  return null;
+}
+
+function splitPoly(poly,x1,y1,x2,y2){
+  let s1=[],s2=[],n=poly.length;
+  for(let i=0;i<n;i++){
+    let a=poly[i],b=poly[(i+1)%n];
+    let sa=lineSide(a.x,a.y,x1,y1,x2,y2),sb=lineSide(b.x,b.y,x1,y1,x2,y2);
+    if(sa>=0)s1.push(a);else s2.push(a);
+    if((sa>0&&sb<0)||(sa<0&&sb>0)){let pt=lineIsect(a.x,a.y,b.x,b.y,x1,y1,x2,y2);if(pt){s1.push(pt);s2.push(pt);}}
+  }
+  return{a1:polyArea(s1),a2:polyArea(s2)};
+}
+
+function sampleCircle(cx,cy,r,n){let p=[];for(let i=0;i<n;i++){let a=2*Math.PI*i/n;p.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});}return p;}
+
+function getArea(name){
+  if(name==='circle') return Math.PI*R*R;
+  if(name==='rectangle'){let p=getParams(name);return p.w*p.h;}
+  return polyArea(getParams(name));
+}
+
+function getSplit(name,x1,y1,x2,y2){
+  if(name==='circle') return splitPoly(sampleCircle(CX,CY,R,200),x1,y1,x2,y2);
+  if(name==='rectangle'){let p=getParams(name);return splitPoly([{x:p.x,y:p.y},{x:p.x+p.w,y:p.y},{x:p.x+p.w,y:p.y+p.h},{x:p.x,y:p.y+p.h}],x1,y1,x2,y2);}
+  return splitPoly(getParams(name),x1,y1,x2,y2);
+}
+
+function drawShape(name,col,alpha){
+  ctx.globalAlpha=alpha??1;ctx.fillStyle=col;
+  if(name==='rectangle'){let p=getParams(name);ctx.beginPath();ctx.roundRect(p.x,p.y,p.w,p.h,4);ctx.fill();}
+  else if(name==='circle'){let p=getParams(name);ctx.beginPath();ctx.arc(p.cx,p.cy,p.r,0,Math.PI*2);ctx.fill();}
+  else{let pts=getParams(name);ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();ctx.fill();}
+  ctx.globalAlpha=1;
+}
+
+function extend(x1,y1,x2,y2,len=1200){
+  let dx=x2-x1,dy=y2-y1,d=Math.sqrt(dx*dx+dy*dy)||1;dx/=d;dy/=d;
+  return[x1-dx*len,y1-dy*len,x2+dx*len,y2+dy*len];
+}
+
+function getScore(off){
+  if(off<.5)return 1000;if(off<1)return 900;if(off<2)return 800;
+  if(off<3)return 700;if(off<5)return 550;if(off<8)return 400;
+  if(off<12)return 250;if(off<18)return 100;return 0;
+}
+function getLabel(s){
+  if(s===1000)return'perfect cut!';if(s>=800)return'incredible!';
+  if(s>=600)return'great!';if(s>=400)return'not bad';if(s>=200)return'keep trying';return'miss!';
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  let s=shapeOrder[gs.round];
+  if(!s)return;
+  if(gs.phase==='draw'){
+    drawShape(s.name,s.color);
+    if(gs.dragging&&gs.start&&gs.end){
+      let [lx1,ly1,lx2,ly2]=extend(gs.start.x,gs.start.y,gs.end.x,gs.end.y);
+      ctx.save();ctx.setLineDash([8,5]);ctx.strokeStyle='var(--color-text-secondary)';
+      ctx.lineWidth=2;ctx.globalAlpha=.45;ctx.beginPath();ctx.moveTo(lx1,ly1);ctx.lineTo(lx2,ly2);ctx.stroke();ctx.restore();
+    }
+  }
+  if(gs.phase==='result'){
+    let {x1,y1,x2,y2}=gs.cut;
+    let[lx1,ly1,lx2,ly2]=extend(x1,y1,x2,y2);
+    drawShape(s.name,s.color,.15);
+    ctx.save();
+    let half=new Path2D();half.moveTo(lx1,ly1);half.lineTo(lx2,ly2);
+    let farX=lx2+(ly2-ly1)*2,farY=ly2-(lx2-lx1)*2;
+    let farX2=lx1+(ly1-ly2)*2,farY2=ly1-(lx1-lx2)*2;
+    half.lineTo(farX,farY);half.lineTo(farX2,farY2);half.closePath();
+    ctx.clip(half);drawShape(s.name,'#7F77DD');ctx.restore();
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(lx1,ly1);ctx.lineTo(lx2,ly2);ctx.stroke();ctx.restore();
+  }
+}
+
+function updateHUD(){
+  let s=shapeOrder[gs.round];
+  document.getElementById('score-val').textContent=gs.score;
+  document.getElementById('best-val').textContent=gs.best!==null?gs.best+'pts':'—';
+  document.getElementById('round-val').textContent=(gs.round+1)+'/'+TOTAL_ROUNDS;
+  document.getElementById('shape-val').textContent=s?s.name:'—';
+}
+
+function showBanner(pts,pct){
+  document.getElementById('rs').textContent=pts+' pts';
+  document.getElementById('rl').textContent=getLabel(pts)+' · '+pct.toFixed(1)+'% / '+(100-pct).toFixed(1)+'%';
+  document.getElementById('rb').classList.add('show');
+}
+function hideBanner(){document.getElementById('rb').classList.remove('show');}
+
+function commitCut(){
+  let s=shapeOrder[gs.round];
+  let{x:x1,y:y1}=gs.start,{x:x2,y:y2}=gs.end;
+  let[lx1,ly1,lx2,ly2]=extend(x1,y1,x2,y2);
+  let{a1,a2}=getSplit(s.name,lx1,ly1,lx2,ly2);
+  if(a1<1||a2<1){render();return;}
+  let pct=(a1/(a1+a2))*100;
+  let off=Math.abs(pct-50);
+  let pts=getScore(off);
+  gs.score+=pts;
+  if(gs.best===null||pts>gs.best)gs.best=pts;
+  gs.cut={x1:lx1,y1:ly1,x2:lx2,y2:ly2};
+  gs.phase='result';
+  updateHUD();showBanner(pts,pct);render();
+  let nb=document.getElementById('nb');
+  nb.style.display='block';
+  nb.textContent=gs.round+1<TOTAL_ROUNDS?'next shape →':'see results →';
+}
+
+function nextRound(){
+  hideBanner();
+  gs.round++;
+  if(gs.round>=TOTAL_ROUNDS){endGame();return;}
+  gs.phase='draw';gs.dragging=false;gs.start=null;gs.end=null;
+  document.getElementById('nb').style.display='none';
+  updateHUD();render();
+}
+
+function saveScore(){
+  let board=[];
+  try{board=JSON.parse(localStorage.getItem('perfectCutLB')||'[]');}catch(e){}
+  board.push({name:playerName,score:gs.score,best:gs.best??0,date:new Date().toLocaleDateString()});
+  board.sort((a,b)=>b.score-a.score);
+  board=board.slice(0,10);
+  try{localStorage.setItem('perfectCutLB',JSON.stringify(board));}catch(e){}
+  return board;
+}
+
+function endGame(){
+  let board=saveScore();
+  document.getElementById('game-area').style.display='none';
+  document.getElementById('nb').style.display='none';
+  showLeaderboard(board,gs.score);
+  document.getElementById('name-screen').style.display='flex';
+}
+
+function showLeaderboard(board,currentScore){
+  let lb=document.getElementById('lb-screen');
+  lb.style.display='flex';
+  let tbody=document.getElementById('lb-body');
+  tbody.innerHTML='';
+  if(board.length===0){tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--color-text-secondary);padding:12px">no scores yet</td></tr>';return;}
+  board.forEach((e,i)=>{
+    let tr=document.createElement('tr');
+    let isYou=e.name===playerName&&e.score===currentScore;
+    tr.innerHTML=`<td${isYou?' class="lb-you"':''}>${i+1}</td><td${isYou?' class="lb-you"':''}>${e.name}${isYou?' (you)':''}</td><td${isYou?' class="lb-you"':''}>${e.score}</td><td${isYou?' class="lb-you"':''}>${e.best}pts</td>`;
+    tbody.appendChild(tr);
+  });
+  if(!document.getElementById('play-again-btn')){
+    let btn=document.createElement('button');
+    btn.id='play-again-btn';btn.textContent='play again';
+    btn.onclick=()=>{
+      document.getElementById('lb-screen').style.display='none';
+      startGame();
+    };
+    lb.appendChild(btn);
+  }
+}
+
+function loadLeaderboard(){
+  let board=[];
+  try{board=JSON.parse(localStorage.getItem('perfectCutLB')||'[]');}catch(e){}
+  if(board.length>0)showLeaderboard(board,null);
+}
+
+function startGame(){
+  playerName=(document.getElementById('name-input').value.trim()||'anonymous').slice(0,20);
+  shapeOrder=getShapeOrder();
+  initGame();
+  document.getElementById('name-screen').style.display='none';
+  let ga=document.getElementById('game-area');ga.style.display='flex';ga.style.flexDirection='column';ga.style.alignItems='center';ga.style.gap='.9rem';ga.style.width='100%';
+  document.getElementById('nb').style.display='none';
+  document.getElementById('inst').textContent='Draw a line across the shape to cut it in half!';
+  updateHUD();render();
+}
+
+document.getElementById('start-btn').onclick=startGame;
+document.getElementById('name-input').addEventListener('keydown',e=>{if(e.key==='Enter')startGame();});
+document.getElementById('nb').onclick=nextRound;
+
+const cw=document.getElementById('cw');
+cw.addEventListener('mousedown',e=>{
+  if(gs.phase!=='draw')return;
+  let r=canvas.getBoundingClientRect();
+  gs.dragging=true;gs.start={x:e.clientX-r.left,y:e.clientY-r.top};gs.end={...gs.start};render();
+});
+cw.addEventListener('mousemove',e=>{
+  if(!gs.dragging)return;
+  let r=canvas.getBoundingClientRect();
+  gs.end={x:e.clientX-r.left,y:e.clientY-r.top};render();
+});
+cw.addEventListener('mouseup',e=>{
+  if(!gs.dragging)return;gs.dragging=false;
+  let dx=gs.end.x-gs.start.x,dy=gs.end.y-gs.start.y;
+  if(Math.sqrt(dx*dx+dy*dy)<10){render();return;}
+  commitCut();
+});
+cw.addEventListener('touchstart',e=>{
+  if(gs.phase!=='draw')return;e.preventDefault();
+  let t=e.touches[0],r=canvas.getBoundingClientRect();
+  gs.dragging=true;gs.start={x:t.clientX-r.left,y:t.clientY-r.top};gs.end={...gs.start};
+},{passive:false});
+cw.addEventListener('touchmove',e=>{
+  if(!gs.dragging)return;e.preventDefault();
+  let t=e.touches[0],r=canvas.getBoundingClientRect();
+  gs.end={x:t.clientX-r.left,y:t.clientY-r.top};render();
+},{passive:false});
+cw.addEventListener('touchend',e=>{
+  if(!gs.dragging)return;gs.dragging=false;commitCut();
+});
+
+loadLeaderboard();
+</script>
