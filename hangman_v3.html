@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hangman</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:sans-serif;background:#fafafa;color:#222;display:flex;flex-direction:column;align-items:center;padding:1.5rem 1rem;margin:0;min-height:100vh}
+  h1{font-size:22px;font-weight:700;margin-bottom:.1rem}
+  /* Level bar */
+  .level-bar{width:100%;max-width:420px;margin:.5rem 0}
+  .level-label{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:3px}
+  .progress-track{height:8px;background:#e5e5e5;border-radius:99px;overflow:hidden}
+  .progress-fill{height:100%;border-radius:99px;transition:width .4s ease;background:#4a90e2}
+  .progress-fill.tier-easy{background:#27ae60}
+  .progress-fill.tier-medium{background:#f39c12}
+  .progress-fill.tier-hard{background:#e74c3c}
+  .tier-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin:.25rem 0}
+  .tier-badge.tier-easy{background:#e8f8ee;color:#1a7a3e}
+  .tier-badge.tier-medium{background:#fff8e1;color:#7a5a00}
+  .tier-badge.tier-hard{background:#fde8e8;color:#c0392b}
+  /* Gallows */
+  .gallows svg{display:block;margin:0 auto}
+  /* Word */
+  .hint-box{font-size:13px;color:#777;text-align:center;margin:.25rem 0}
+  .word-display{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:1rem 0}
+  .word-letter{width:28px;text-align:center;font-size:22px;font-weight:700;border-bottom:2.5px solid #333;padding-bottom:2px;line-height:1.4}
+  .status-msg{text-align:center;font-size:17px;font-weight:600;margin:.5rem 0;min-height:26px}
+  /* Keyboard */
+  #keyboard{display:flex;flex-wrap:wrap;justify-content:center;max-width:380px;margin:.25rem auto}
+  .letter-btn{width:34px;height:34px;margin:2px;border:1px solid #ccc;background:#fff;color:#222;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:background .1s}
+  .letter-btn:hover:not(:disabled){background:#f0f0f0}
+  .letter-btn:disabled{opacity:.28;cursor:default}
+  .letter-btn.wrong{background:#fde8e8;color:#c0392b;border-color:#e88}
+  .letter-btn.right{background:#e8f8ee;color:#1a7a3e;border-color:#8d8}
+  .letter-btn.flash{background:#ddeeff;border-color:#88b}
+  /* Buttons */
+  .action-row{display:flex;gap:10px;margin-top:.75rem;flex-wrap:wrap;justify-content:center}
+  button.action{padding:8px 20px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:14px;cursor:pointer}
+  button.action:hover{background:#f0f0f0}
+  button.action.primary{background:#222;color:#fff;border-color:#222}
+  button.action.primary:hover{background:#444}
+  /* Score */
+  .score-row{font-size:13px;color:#666;margin:.25rem 0}
+  .kbd-hint{font-size:11px;color:#bbb;text-align:center;margin:.4rem 0 0}
+  /* Completion overlay */
+  #completion{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}
+  #completion.show{display:flex}
+  .completion-card{background:#fff;border-radius:16px;padding:2.5rem 2rem;text-align:center;max-width:340px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.18)}
+  .completion-card h2{font-size:28px;margin:0 0 .5rem}
+  .completion-card p{color:#666;font-size:15px;margin:.5rem 0}
+  .completion-card .stars{font-size:36px;letter-spacing:4px;margin:.5rem 0}
+  .completion-card .tier-label{font-size:13px;font-weight:600;margin-bottom:1rem}
+  .completion-card button{margin-top:1rem;padding:10px 28px;background:#222;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;width:100%}
+  .completion-card button:hover{background:#444}
+</style>
+</head>
+<body>
+<h1>&#x1F3AE; Hangman</h1>
+
+<!-- Completion overlay -->
+<div id="completion">
+  <div class="completion-card">
+    <div class="stars" id="c-stars">&#x2B50;&#x2B50;&#x2B50;</div>
+    <h2 id="c-title">Stage Complete!</h2>
+    <div class="tier-label" id="c-tier"></div>
+    <p id="c-msg"></p>
+    <p class="score-row" id="c-score"></p>
+    <button onclick="nextStage()">Continue &#x2192;</button>
+  </div>
+</div>
+
+<div class="level-bar">
+  <div class="level-label">
+    <span id="lbl-level">Level 1 / 50</span>
+    <span id="lbl-tier" class="tier-badge tier-easy">&#x1F7E2; Easy</span>
+  </div>
+  <div class="progress-track"><div class="progress-fill tier-easy" id="progress-fill"></div></div>
+</div>
+
+<div class="score-row" id="score-row">&#x2705; 0 &nbsp;|&nbsp; &#x274C; 0 &nbsp;|&nbsp; Mistakes left: 6</div>
+
+<div class="gallows">
+  <svg width="150" height="150" viewBox="0 0 160 160">
+    <line x1="20" y1="155" x2="140" y2="155" stroke="#ccc" stroke-width="2"/>
+    <line x1="50" y1="155" x2="50" y2="10" stroke="#ccc" stroke-width="2"/>
+    <line x1="50" y1="10" x2="100" y2="10" stroke="#ccc" stroke-width="2"/>
+    <line x1="100" y1="10" x2="100" y2="30" stroke="#ccc" stroke-width="2"/>
+    <circle id="p-head" cx="100" cy="42" r="12" stroke="#c0392b" stroke-width="2.5" fill="none" opacity="0"/>
+    <line id="p-body" x1="100" y1="54" x2="100" y2="100" stroke="#c0392b" stroke-width="2.5" opacity="0"/>
+    <line id="p-larm" x1="100" y1="65" x2="78" y2="85" stroke="#c0392b" stroke-width="2.5" opacity="0"/>
+    <line id="p-rarm" x1="100" y1="65" x2="122" y2="85" stroke="#c0392b" stroke-width="2.5" opacity="0"/>
+    <line id="p-lleg" x1="100" y1="100" x2="78" y2="125" stroke="#c0392b" stroke-width="2.5" opacity="0"/>
+    <line id="p-rleg" x1="100" y1="100" x2="122" y2="125" stroke="#c0392b" stroke-width="2.5" opacity="0"/>
+  </svg>
+</div>
+
+<div class="hint-box" id="hint-box"></div>
+<div class="word-display" id="word-display"></div>
+<div class="status-msg" id="status-msg"></div>
+<div id="keyboard"></div>
+<div class="kbd-hint">&#x2328;&#xFE0F; Type letters on your keyboard</div>
+<div class="action-row">
+  <button class="action" onclick="retryLevel()">&#x21BA; Retry</button>
+  <button class="action" onclick="restartGame()">&#x1F504; Restart</button>
+</div>
+
+<script>
+const LEVELS=[
+{w:'SONG',h:'A piece of music with words'},
+{w:'WING',h:'A limb used for flying'},
+{w:'ZOO',h:'A place where animals are kept for viewing'},
+{w:'BALL',h:'A round object used in sports'},
+{w:'COST',h:'The price of something'},
+{w:'DIRT',h:'Soil or filth'},
+{w:'FLAG',h:'A piece of cloth representing a country'},
+{w:'LAB',h:'A room for scientific experiments'},
+{w:'YOGA',h:'A physical and mental discipline'},
+{w:'PLUM',h:'A small purple fruit'},
+{w:'ROOF',h:'The top covering of a building'},
+{w:'SHOW',h:'To make visible'},
+{w:'HAM',h:'Cured pig meat'},
+{w:'SELL',h:'To exchange for money'},
+{w:'NINE',h:'The number after eight'},
+{w:'OBEY',h:'To follow instructions'},
+{w:'SOAP',h:'A cleaning substance'},
+{w:'KEEP',h:'To retain possession of'},
+{w:'POUR',h:'To flow in a stream'},
+{w:'TRIP',h:'A journey or to stumble'},
+{w:'FROG',h:'A small green jumping amphibian'},
+{w:'TOWN',h:'A settlement smaller than a city'},
+{w:'LEAD',h:'To guide or a heavy metal'},
+{w:'HOOK',h:'A curved piece of metal'},
+{w:'KICK',h:'To strike with your foot'},
+{w:'CALL',h:'To use a phone or shout to someone'},
+{w:'CLAY',h:'A soft sticky earth used for pottery'},
+{w:'HALT',h:'To stop'},
+{w:'MILD',h:'Not extreme or harsh'},
+{w:'KNOW',h:'To be aware of'},
+{w:'REAL',h:'Actually existing'},
+{w:'WEAK',h:'Lacking strength'},
+{w:'PIPE',h:'A hollow tube'},
+{w:'BAR',h:'A long rod or a place to drink'},
+{w:'MIX',h:'To combine ingredients'},
+{w:'SCAN',h:'To look over quickly'},
+{w:'ODD',h:'Strange or unusual'},
+{w:'COOL',h:'Slightly cold or fashionable'},
+{w:'BUS',h:'A large public vehicle'},
+{w:'SAP',h:'The liquid inside a plant'},
+{w:'LAWN',h:'An area of cut grass'},
+{w:'TUSK',h:'A long pointed tooth'},
+{w:'TAME',h:'Not wild'},
+{w:'SNOW',h:'White frozen precipitation'},
+{w:'LIP',h:'The edge of your mouth'},
+{w:'REEF',h:'An underwater ridge near the surface'},
+{w:'PINE',h:'An evergreen tree'},
+{w:'SWAN',h:'A large white water bird'},
+{w:'SKIN',h:'The outer covering of the body'},
+{w:'FARM',h:'Land used for growing crops'},
+{w:'BROWN',h:'The color of wood or chocolate'},
+{w:'SPEND',h:'To use money'},
+{w:'QUEUE',h:'A line of waiting people'},
+{w:'TOUCH',h:'To come into contact with'},
+{w:'HEDGE',h:'A row of bushes forming a boundary'},
+{w:'BISON',h:'A large North American buffalo'},
+{w:'SHIRT',h:'A garment for the upper body'},
+{w:'CLOCK',h:'A device for measuring time'},
+{w:'GRAPE',h:'A small fruit used to make wine'},
+{w:'FRESH',h:'New or not stale'},
+{w:'SLOPE',h:'A surface at an angle'},
+{w:'ROUTE',h:'A path or direction'},
+{w:'BOUND',h:'Tied up or heading toward'},
+{w:'LOGIC',h:'Systematic reasoning'},
+{w:'UNDER',h:'Below'},
+{w:'WHALE',h:'The largest sea mammal'},
+{w:'ALERT',h:'Watchful and ready'},
+{w:'TRACE',h:'A mark or to follow a path'},
+{w:'AUDIT',h:'An official financial examination'},
+{w:'GRAVE',h:'A burial place'},
+{w:'THIEF',h:'A person who steals'},
+{w:'LAUGH',h:'To make sounds of amusement'},
+{w:'DWARF',h:'A mythical small creature'},
+{w:'CLAIM',h:'To state something is true'},
+{w:'AZURE',h:'A bright blue color'},
+{w:'DELTA',h:'The Greek letter or a river mouth'},
+{w:'SHAME',h:'A painful feeling of humiliation'},
+{w:'MANOR',h:'A large country house'},
+{w:'PLANT',h:'A living organism that grows in soil'},
+{w:'BRICK',h:'A block used in building'},
+{w:'HAIKU',h:'A Japanese poem of 17 syllables'},
+{w:'PIANO',h:'A large keyboard instrument'},
+{w:'VIRAL',h:'Spreading rapidly online'},
+{w:'WORST',h:'Most bad'},
+{w:'COBRA',h:'A venomous hooded snake'},
+{w:'SCARE',h:'To frighten'},
+{w:'SLIDE',h:'To move smoothly on a surface'},
+{w:'ABUSE',h:'Misuse or cruel treatment'},
+{w:'CANAL',h:'An artificial waterway'},
+{w:'VAPOR',h:'Gas formed from a liquid'},
+{w:'CREEK',h:'A small stream'},
+{w:'WORLD',h:'The Earth or everything in existence'},
+{w:'STAIN',h:'A mark left by a substance'},
+{w:'DRIFT',h:'To be carried by water or wind'},
+{w:'MAPLE',h:'A tree known for its syrup'},
+{w:'NINJA',h:'A Japanese secret agent'},
+{w:'PLAZA',h:'A public open square'},
+{w:'RALLY',h:'A mass meeting or comeback'},
+{w:'AROMA',h:'A pleasant smell'},
+{w:'SCARF',h:'A strip of fabric worn around the neck'},
+{w:'JUBILEE',h:'A special anniversary'},
+{w:'VENOMOUS',h:'Producing venom'},
+{w:'RAPTURE',h:'A feeling of intense joy'},
+{w:'DOMAIN',h:'An area of territory or knowledge'},
+{w:'COMPEL',h:'To force someone to do something'},
+{w:'LINGER',h:'To stay longer than necessary'},
+{w:'BANISH',h:'To send away as punishment'},
+{w:'DISPEL',h:'To make a feeling go away'},
+{w:'HALLOWED',h:'Holy or greatly revered'},
+{w:'DELUDE',h:'To make someone believe false things'},
+{w:'EMBLEM',h:'A symbol representing something'},
+{w:'CALLOUS',h:'Showing no concern for others'},
+{w:'DILEMMA',h:'A difficult choice'},
+{w:'DAMPEN',h:'To make slightly wet'},
+{w:'NURTURE',h:'To care for and encourage'},
+{w:'VANQUISH',h:'To defeat thoroughly'},
+{w:'MISHAP',h:'An unlucky accident'},
+{w:'AVENGE',h:'To take revenge for'},
+{w:'ADOBE',h:'A building material made of clay'},
+{w:'CONCEDE',h:'To admit defeat'},
+{w:'VERDICT',h:'A decision in court'},
+{w:'HUMBLE',h:'Having a modest view of oneself'},
+{w:'ROBUST',h:'Strong and healthy'},
+{w:'MIRAGE',h:'An optical illusion in heat'},
+{w:'PIOUS',h:'Deeply religious'},
+{w:'RESILIENT',h:'Recovering quickly from hardship'},
+{w:'FRUGAL',h:'Using resources carefully'},
+{w:'SUBLIME',h:'Of extreme beauty'},
+{w:'UPHEAVAL',h:'A violent disturbance'},
+{w:'FESTER',h:'To become worse'},
+{w:'TOXIC',h:'Poisonous'},
+{w:'SPECULATE',h:'To form theories without firm evidence'},
+{w:'OBLIGE',h:'To make someone feel they must do something'},
+{w:'ACRID',h:'Having a sharp unpleasant smell'},
+{w:'INSIST',h:'To demand firmly'},
+{w:'CYNICAL',h:'Distrustful of human sincerity'},
+{w:'SPURIOUS',h:'False or fake'},
+{w:'MAMMOTH',h:'A large extinct elephant'},
+{w:'COHORT',h:'A group of associates'},
+{w:'JEOPARDIZE',h:'To put at risk'},
+{w:'STEALTH',h:'Moving without being detected'},
+{w:'ILLUSION',h:'A false perception'},
+{w:'CAVERN',h:'A large underground space'},
+{w:'DEVOUR',h:'To eat hungrily'},
+{w:'BEACON',h:'A signal fire or lighthouse'},
+{w:'CONVICT',h:'To declare guilty'},
+{w:'ERRANT',h:'Straying from the right course'},
+{w:'MELANCHOLY',h:'Deep sadness'},
+{w:'COVERT',h:'Hidden and secret'},
+{w:'BOUQUET',h:'A bunch of flowers'}
+];
+
+const PARTS=["p-head","p-body","p-larm","p-rarm","p-lleg","p-rleg"];
+const TIER_NAMES=["Easy","Medium","Hard"];
+const TIER_COLORS=["tier-easy","tier-medium","tier-hard"];
+const TIER_ICONS=["&#x1F7E2;","&#x1F7E1;","&#x1F534;"];
+const STAGE_SIZE=50;
+
+let currentLevel=0, wins=0, losses=0;
+let word, hint, guessed, wrong, gameOver=false;
+
+function tierOf(lvl){ return Math.floor(lvl/STAGE_SIZE); }
+function levelInStage(lvl){ return lvl%STAGE_SIZE; }
+
+function updateUI(){
+  const tier=tierOf(currentLevel);
+  const pos=levelInStage(currentLevel);
+  const tc=TIER_COLORS[tier]||"tier-hard";
+  const tn=TIER_NAMES[tier]||"Hard";
+  const ti=TIER_ICONS[tier]||"&#x1F534;";
+  // Level label
+  document.getElementById("lbl-level").textContent="Level "+(pos+1)+" / "+STAGE_SIZE;
+  const badge=document.getElementById("lbl-tier");
+  badge.innerHTML=ti+" "+tn;
+  badge.className="tier-badge "+tc;
+  // Progress bar
+  const fill=document.getElementById("progress-fill");
+  fill.style.width=((pos+1)/STAGE_SIZE*100)+"%";
+  fill.className="progress-fill "+tc;
+  // Score
+  document.getElementById("score-row").innerHTML=
+    "&#x2705; "+wins+" &nbsp;|&nbsp; &#x274C; "+losses+" &nbsp;|&nbsp; Mistakes left: "+(PARTS.length-wrong);
+}
+
+function startLevel(){
+  const entry=LEVELS[currentLevel]||LEVELS[LEVELS.length-1];
+  word=entry.w; hint=entry.h;
+  guessed=new Set(); wrong=0; gameOver=false;
+  document.getElementById("status-msg").textContent="";
+  document.getElementById("hint-box").textContent="Hint: "+hint;
+  PARTS.forEach(id=>document.getElementById(id).style.opacity="0");
+  renderKeyboard(); renderWord(); updateUI();
+}
+
+function renderKeyboard(){
+  const kb=document.getElementById("keyboard"); kb.innerHTML="";
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(l=>{
+    const btn=document.createElement("button");
+    btn.className="letter-btn"; btn.textContent=l; btn.id="btn-"+l;
+    btn.onclick=()=>guess(l); kb.appendChild(btn);
+  });
+}
+
+function renderWord(){
+  const wd=document.getElementById("word-display"); wd.innerHTML="";
+  word.split("").forEach(c=>{
+    const span=document.createElement("span");
+    span.className="word-letter";
+    span.textContent=guessed.has(c)?c:" ";
+    wd.appendChild(span);
+  });
+}
+
+function guess(l){
+  if(gameOver||guessed.has(l))return;
+  guessed.add(l);
+  const btn=document.getElementById("btn-"+l);
+  if(btn){ btn.disabled=true; btn.classList.add(word.includes(l)?"right":"wrong"); }
+  if(word.includes(l)){
+    renderWord();
+    if(word.split("").every(c=>guessed.has(c))){
+      wins++; gameOver=true;
+      updateUI();
+      const nextLvl=currentLevel+1;
+      // Check if stage complete
+      if(nextLvl%STAGE_SIZE===0||nextLvl>=LEVELS.length){
+        setTimeout(()=>showCompletion(currentLevel),600);
+      } else {
+        document.getElementById("status-msg").textContent="&#x1F389; Correct!";
+        setTimeout(()=>{ currentLevel=nextLvl; startLevel(); },1000);
+      }
+    }
+  } else {
+    document.getElementById(PARTS[wrong]).style.opacity="1";
+    wrong++;
+    updateUI();
+    if(wrong>=PARTS.length){
+      losses++; gameOver=true;
+      document.getElementById("status-msg").textContent="The word was: "+word;
+      word.split("").forEach(c=>guessed.add(c));
+      renderWord();
+      document.querySelectorAll(".letter-btn:not(:disabled)").forEach(b=>b.disabled=true);
+      updateUI();
+    }
+  }
+}
+
+function showCompletion(lvl){
+  const tier=tierOf(lvl);
+  const tn=TIER_NAMES[tier]||"Expert";
+  const isLast=(lvl+1>=LEVELS.length);
+  document.getElementById("c-stars").innerHTML="&#x2B50;&#x2B50;&#x2B50;";
+  document.getElementById("c-title").textContent=isLast?"&#x1F3C6; You Completed All Stages!":"Stage Complete!";
+  const badge=document.getElementById("c-tier");
+  badge.textContent=tn+" Stage Clear";
+  badge.className="tier-label tier-badge "+TIER_COLORS[tier];
+  document.getElementById("c-msg").textContent=isLast
+    ? "Amazing! You finished all 150 levels across Easy, Medium & Hard!"
+    : "You cleared all 50 "+(tn)+" levels! Ready for the next challenge?";
+  document.getElementById("c-score").innerHTML="&#x2705; "+wins+" wins &nbsp; &#x274C; "+losses+" losses";
+  // Update continue button
+  const btn=document.querySelector(".completion-card button");
+  if(isLast){ btn.textContent="Play Again"; btn.onclick=restartGame; }
+  else { btn.textContent="Next Stage →"; btn.onclick=nextStage; }
+  document.getElementById("completion").classList.add("show");
+}
+
+function nextStage(){
+  currentLevel=Math.ceil((currentLevel+1)/STAGE_SIZE)*STAGE_SIZE;
+  if(currentLevel>=LEVELS.length)currentLevel=0;
+  document.getElementById("completion").classList.remove("show");
+  startLevel();
+}
+
+function retryLevel(){
+  if(!gameOver&&wrong===0)return;
+  guessed=new Set(); wrong=0; gameOver=false;
+  document.getElementById("status-msg").textContent="";
+  PARTS.forEach(id=>document.getElementById(id).style.opacity="0");
+  renderKeyboard(); renderWord(); updateUI();
+}
+
+function restartGame(){
+  currentLevel=0; wins=0; losses=0;
+  document.getElementById("completion").classList.remove("show");
+  startLevel();
+}
+
+document.addEventListener("keydown",e=>{
+  const l=e.key.toUpperCase();
+  if(/^[A-Z]$/.test(l)&&!gameOver){
+    const btn=document.getElementById("btn-"+l);
+    if(btn&&!btn.disabled){
+      btn.classList.add("flash");
+      setTimeout(()=>btn.classList.remove("flash"),150);
+      guess(l);
+    }
+  }
+});
+
+startLevel();
+</script>
+</body>
+</html>
