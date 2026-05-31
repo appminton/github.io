@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --cream:#F7F3EE;
+  --ink:#1A1612;
+  --rust:#C4572A;
+  --rust-light:#F0DDD4;
+  --muted:#6B6059;
+  --border:#DDD5CC;
+}
+body{font-family:'Fraunces',serif;background:var(--cream);color:var(--ink);min-height:100vh;}
+nav{display:flex;justify-content:space-between;align-items:center;padding:1.5rem 3rem;border-bottom:1px solid var(--border);}
+.nav-logo{font-size:1.1rem;font-weight:500;letter-spacing:0.02em;}
+.nav-links{display:flex;gap:2rem;list-style:none;}
+.nav-links a{font-family:'DM Mono',monospace;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
+.nav-links a:hover{color:var(--rust)}
+.hero{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - 73px);}
+.hero-left{padding:5rem 3rem 4rem;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid var(--border);}
+.hero-tag{font-family:'DM Mono',monospace;font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--rust);margin-bottom:2rem;}
+.hero-name{font-size:clamp(3.5rem,7vw,6rem);font-weight:300;line-height:1.02;letter-spacing:-0.02em;}
+.hero-name em{font-style:italic;font-weight:300;color:var(--rust);}
+.hero-bio{font-family:'Fraunces',serif;font-size:1.05rem;line-height:1.8;color:var(--muted);max-width:38ch;margin-top:3rem;}
+.hero-cta{display:inline-flex;align-items:center;gap:0.75rem;margin-top:3.5rem;font-family:'DM Mono',monospace;font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);text-decoration:none;border:1px solid var(--ink);padding:0.85rem 1.5rem;transition:background 0.2s,color 0.2s;width:fit-content;}
+.hero-cta:hover{background:var(--ink);color:var(--cream)}
+.hero-cta svg{width:14px;height:14px}
+.hero-right{padding:5rem 3rem 4rem;display:flex;flex-direction:column;gap:3rem;}
+.section-label{font-family:'DM Mono',monospace;font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:1.25rem;}
+.project-card{border:1px solid var(--border);padding:1.5rem;transition:border-color 0.2s;cursor:pointer;}
+.project-card:hover{border-color:var(--rust)}
+.project-num{font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--rust);margin-bottom:0.75rem;}
+.project-title{font-size:1.15rem;font-weight:500;margin-bottom:0.4rem;}
+.project-desc{font-size:0.9rem;color:var(--muted);line-height:1.6;}
+.project-tags{display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap;}
+.tag{font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.06em;padding:0.25rem 0.6rem;background:var(--rust-light);color:var(--rust);}
+.skills-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;}
+.skill-item{font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);padding:0.5rem 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;}
+.skill-dot{width:5px;height:5px;border-radius:50%;background:var(--rust);flex-shrink:0}
+.footer{border-top:1px solid var(--border);padding:1.5rem 3rem;display:flex;justify-content:space-between;align-items:center;}
+.footer-copy{font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);letter-spacing:0.06em;}
+.social-links{display:flex;gap:1.5rem}
+.social-links a{font-family:'DM Mono',monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
+.social-links a:hover{color:var(--rust)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">MY PORTFOLIO</div>
+  <ul class="nav-links">
+    <li><a href="#">Work</a></li>
+    <li><a href="#">About</a></li>
+    <li><a href="#">Writing</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</nav>
+
+<main class="hero">
+  <div class="hero-left">
+    <div>
+      <p class="hero-tag">Available for freelance · Singapore</p>
+      <h1 class="hero-name">Creative<br><em>Developer</em><br>& Designer</h1>
+      <p class="hero-bio">I build thoughtful digital products — from early concept to polished interface. Focused on the space where design and code become one thing.</p>
+      <a href="#" class="hero-cta">
+        See my work
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg>
+      </a>
+    </div>
+    <div>
+      <p class="section-label">Skills</p>
+      <div class="skills-grid">
+        <div class="skill-item"><div class="skill-dot"></div>React / Next.js</div>
+        <div class="skill-item"><div class="skill-dot"></div>TypeScript</div>
+        <div class="skill-item"><div class="skill-dot"></div>Figma</div>
+        <div class="skill-item"><div class="skill-dot"></div>Node.js</div>
+        <div class="skill-item"><div class="skill-dot"></div>CSS / Animation</div>
+        <div class="skill-item"><div class="skill-dot"></div>Python</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <p class="section-label">Selected work</p>
+    <div class="project-card">
+      <p class="project-num">01</p>
+      <p class="project-title">Folio Dashboard</p>
+      <p class="project-desc">A portfolio analytics platform for independent creators, with real-time revenue tracking and audience insights.</p>
+      <div class="project-tags">
+        <span class="tag">React</span>
+        <span class="tag">D3.js</span>
+        <span class="tag">Stripe API</span>
+      </div>
+    </div>
+    <div class="project-card">
+      <p class="project-num">02</p>
+      <p class="project-title">Botanica App</p>
+      <p class="project-desc">A plant care companion with species identification and custom watering schedules. 4k+ active users.</p>
+      <div class="project-tags">
+        <span class="tag">React Native</span>
+        <span class="tag">ML Kit</span>
+        <span class="tag">Supabase</span>
+      </div>
+    </div>
+    <div class="project-card">
+      <p class="project-num">03</p>
+      <p class="project-title">Typeset</p>
+      <p class="project-desc">Open-source typography playground for developers. Explore pairings, scales, and fluid sizing in real time.</p>
+      <div class="project-tags">
+        <span class="tag">Vanilla JS</span>
+        <span class="tag">CSS</span>
+        <span class="tag">Open Source</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <p class="footer-copy">© 2026 Meliana Chen — built with GitHub Pages</p>
+  <div class="social-links">
+    <a href="#">GitHub</a>
+    <a href="#">LinkedIn</a>
+    <a href="#">Email</a>
+  </div>
+</footer>
+
+</body>
+</html>
